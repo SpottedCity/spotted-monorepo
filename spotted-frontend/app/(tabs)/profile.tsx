@@ -1,15 +1,21 @@
 import CustomButton from '@/components/custom-button';
-import CustomInput from '@/components/custom-input';
 import ProgressBar from '@/components/progress-bar';
 import { SIZES } from '@/constants/sizes';
 import { Colors } from '@/constants/theme';
 import { mockCurrentUser } from '@/constants/user-data';
 import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { useImagePicker } from '@/hooks/use-image-picker';
+
 
 export default function Profile() {
+  const {imageUri, pickImage} = useImagePicker();
+
+
   const LogOutMock = () => {
     console.log('Wylogowano');
   };
@@ -25,10 +31,10 @@ export default function Profile() {
           {/* Profil Image Container */}
           <View style={styles.profileImageContainer}>
             <View style={styles.imageWrapper}>
-              <Image source={require('@/assets/images/pfp.jpg')} style={styles.profileImage} />
+              <Image source={imageUri? {uri: imageUri} : require('@/assets/images/pfp.jpg')} style={styles.profileImage} />
               <Pressable
                 style={styles.editIconContainer}
-                onPress={() => console.log('Edycja zdjęcia')}
+                onPress={() => pickImage(true)}
               >
                 <Feather name={'camera'} size={18} color={Colors.white} />
               </Pressable>

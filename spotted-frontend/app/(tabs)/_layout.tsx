@@ -75,7 +75,7 @@ export default function TabLayout() {
   return (
     <Tabs tabBar={(props) => <MyCustomTabBar {...props} />} screenOptions={{ headerShown: false }}>
       {/* tutaj można zmieniać nazwy pod ikonami */}
-      <Tabs.Screen name="home" options={{ title: 'Mapa' }} />{' '}
+      <Tabs.Screen name="home" options={{ title: 'Mapa' }} />
       <Tabs.Screen name="report" options={{ title: 'Zgłoś' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profil' }} />
     </Tabs>
