@@ -2,8 +2,10 @@ import CustomButton from '@/components/custom-button';
 import GoogleSignInButton from '@/components/google-sign-in-button';
 import { SIZES } from '@/constants/sizes';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/context/auth-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import React from 'react';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -20,9 +22,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [apiError, setApiError] = useState('');
+  
+  const {login} = useAuth();
+  const router = useRouter()
 
   const validateForm = () => {
     let isValid = true;
@@ -47,15 +52,22 @@ export default function LoginScreen() {
 
     return isValid;
   };
+;
 
-  const router = useRouter();
+  const handleLoginMock = async () => {
+    if (!validateForm()) return;
+    setApiError('');
 
-  const handleLoginMock = () => {
-    if (!validateForm()) {
-      return;
+    try{
+      console.log('Log in ', email);
+      await login(email, password);
+
+      router.replace('/(tabs)/home');
+    } catch (error: any) {
+      setApiError('Wrong e-mail or password');
     }
-    console.log('logowanie emailem: ${email, hasło: ${password}');
-    router.replace('/(tabs)/home');
+
+
   };
   const handleGoogleLogin = () => {
     router.replace('/(tabs)/home');
@@ -114,6 +126,7 @@ export default function LoginScreen() {
               </View>
             </View>
             <View style={styles.bottomSection}>
+              {apiError ? <Text style={[styles.errorText, {textAlign: 'center', marginBottom: 10}]}>{apiError}</Text> : null}
               <CustomButton title="Zaloguj się" iconName="sign-in" onPress={handleLoginMock} />
               <GoogleSignInButton onPress={handleGoogleLogin} />
 

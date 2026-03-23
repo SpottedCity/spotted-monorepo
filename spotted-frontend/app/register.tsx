@@ -2,8 +2,10 @@ import CustomButton from '@/components/custom-button';
 import GoogleSignInButton from '@/components/google-sign-in-button';
 import { SIZES } from '@/constants/sizes';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/context/auth-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import React from 'react';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -21,12 +23,14 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
-
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [usernameError, setUsernameError] = useState('');
+  const [apiError, setApiError] = useState('');
+
 
   const router = useRouter();
+  const {register} = useAuth();
 
   const validateForm = () => {
     let isValid = true;
@@ -66,12 +70,19 @@ export default function LoginScreen() {
     return isValid;
   };
 
-  const handleRegisterMock = () => {
-    if (!validateForm()) {
-      return;
+  const handleRegisterMock = async () => {
+    if (!validateForm()) return;
+    setApiError('');
+
+    try{
+      console.log('Register', email);
+      await register(email, password, username);
+      router.replace('/(tabs)/home');
+    } catch (error: any)
+    {
+      setApiError('An account with this email address or name already exists');
     }
-    console.log('logowanie emailem: ${email, hasło: ${password}');
-    router.replace('/(tabs)/home');
+
   };
   const handleGoogleRegister = () => {
     router.replace('/(tabs)/home');
@@ -135,6 +146,7 @@ export default function LoginScreen() {
               </View>
             </View>
             <View style={styles.bottomSection}>
+              {apiError ? <Text style={[styles.errorText, {textAlign: 'center', marginBottom: 10}]}>{apiError}</Text> : null}
               <CustomButton title="Zarejestruj się" iconName="user" onPress={handleRegisterMock} />
               <GoogleSignInButton onPress={handleGoogleRegister} />
 
