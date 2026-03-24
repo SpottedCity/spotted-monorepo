@@ -8,16 +8,29 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { useImagePicker } from '@/hooks/use-image-picker';
-
+import { useAuth } from '@/context/auth-context';
+import { useRouter } from 'expo-router';
 
 export default function Profile() {
-  const {imageUri, pickImage} = useImagePicker();
+  const { imageUri, pickImage } = useImagePicker();
+  const [apiError, setApiError] = useState('');
+
+  const { logout } = useAuth();
+  const router = useRouter();
 
 
-  const LogOutMock = () => {
-    console.log('Wylogowano');
+  const handleLogOut = async () => {
+    setApiError('');
+
+    try {
+      console.log('Log out');
+      await logout();
+
+      router.replace('/login');
+    } catch (error: any) {
+      console.log('Logout error:', error);
+    }
   };
 
   return (
@@ -31,11 +44,11 @@ export default function Profile() {
           {/* Profil Image Container */}
           <View style={styles.profileImageContainer}>
             <View style={styles.imageWrapper}>
-              <Image source={imageUri? {uri: imageUri} : require('@/assets/images/pfp.jpg')} style={styles.profileImage} />
-              <Pressable
-                style={styles.editIconContainer}
-                onPress={() => pickImage(true)}
-              >
+              <Image
+                source={imageUri ? { uri: imageUri } : require('@/assets/images/pfp.jpg')}
+                style={styles.profileImage}
+              />
+              <Pressable style={styles.editIconContainer} onPress={() => pickImage(true)}>
                 <Feather name={'camera'} size={18} color={Colors.white} />
               </Pressable>
             </View>
@@ -123,7 +136,7 @@ export default function Profile() {
 
           {/* LOG OUT  */}
           <View style={styles.buttonContainer}>
-            <CustomButton title="Wyloguj się" onPress={LogOutMock} iconName="sign-out" />
+            <CustomButton title="Wyloguj się" onPress={handleLogOut} iconName="sign-out" />
           </View>
         </ScrollView>
       </LinearGradient>

@@ -1,100 +1,105 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiClient } from '@/constants/api';
-import { saveToken, getToken, removeToken } from '@/utils/storage';
-import { jwtDecode } from 'jwt-decode'; 
+import { supabase } from '@/utils/supabase';
 
-export interface JwtPayload {
-    sub: string;
-    email: string;
+export interface User {
+  id: string;
+  supabaseId: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  avatar?: string;
 }
 
-interface User {
-    id: string;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    avatar?: string;
-}
-
-export interface AuthResponse {
-    accessToken: string;
-    user: User;
-}
-
-
-interface AuthContextType{
-    user: User | null;
-    isLoading: boolean;
-    login: (email: string, password: string) => Promise<void>;
-    register: (email: string, password: string, username: string) => Promise<void>; 
-    logout: () => Promise<void>
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, username: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({children} : {children: React.ReactNode})
-{
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        const loadUser = async () => {
-            try {
-                const token = await getToken('jwt_token');
-                if(token){
-                    const decoded = jwtDecode<JwtPayload>(token);
-
-                    const resposne = await apiClient.get(`/users/${decoded.sub}`);
-                    setUser(resposne.data);
-                }
-            } catch (error)
-            {
-                console.error('Problem with session: ', error);
-                await removeToken('jwt_token');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        loadUser();
-    }, [])
-
-
-    const login = async(email: string, password: string) => {
-        const response = await apiClient.post('/auth/sigin', {email: email, password: password});
-        const {accessToken, user: userData} = response.data;
-
-        await saveToken('jwt_token', accessToken);
-        setUser(userData);
+  const syncProfileWithBackend = async () => {
+    try {
+      const response = await apiClient.get<User>('/auth/me');
+      setUser(response.data);
+    } catch (error) {
+      console.error('Error - profile sync with backend', error);
+      setUser(null);
     }
+  };
 
-    const register = async(email: string, password: string, username: string) => {
-        const reponse = await apiClient.post('auth/signup',
-            {
-                email,
-                password,
-                firstName: username
-            }
-        );
-        await login(email, password);
-    }
-
-    const logout = async () => {
-        await removeToken('jwt_token');
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) syncProfileWithBackend();
+      else setIsLoading(false);
+    });
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        syncProfileWithBackend().finally(() => setIsLoading(false));
+      } else {
         setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  };
+
+  const register = async (email: string, password: string, username: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: username
+        }
+      }
+    });
+    if (error) throw error;
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const loginWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/home` : undefined
+      }
+    });
+
+    if (error) {
+      console.error('Błąd logowania Google:', error);
+      throw error;
     }
+  };
 
-    return (
-        <AuthContext.Provider value={{user, isLoading, login, register, logout}}>
-            {children}
-        </AuthContext.Provider>
-    );
-
-
+  return (
+    <AuthContext.Provider value={{ user, isLoading, login, loginWithGoogle, register, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
-
 
 export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if(!context) throw new Error('useAuth must be used within an AuthProvider');
-    return context;
-}
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};
