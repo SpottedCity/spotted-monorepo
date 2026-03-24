@@ -2,8 +2,10 @@ import CustomButton from '@/components/custom-button';
 import GoogleSignInButton from '@/components/google-sign-in-button';
 import { SIZES } from '@/constants/sizes';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/context/auth-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import React from 'react';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -17,16 +19,17 @@ import {
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function LoginScreen() {
+export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
-
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [usernameError, setUsernameError] = useState('');
+  const [apiError, setApiError] = useState('');
 
   const router = useRouter();
+  const { register, loginWithGoogle } = useAuth();
 
   const validateForm = () => {
     let isValid = true;
@@ -66,15 +69,29 @@ export default function LoginScreen() {
     return isValid;
   };
 
-  const handleRegisterMock = () => {
-    if (!validateForm()) {
-      return;
+  const handleRegisterMock = async () => {
+    if (!validateForm()) return;
+    setApiError('');
+
+    try {
+      console.log('Register', email);
+      await register(email, password, username);
+      router.replace('/(tabs)/home');
+    } catch (error: any) {
+      console.log('Supabase Error:', error);
+      setApiError(error.message || 'Wrong e-mail or password');
     }
-    console.log('logowanie emailem: ${email, hasło: ${password}');
-    router.replace('/(tabs)/home');
   };
-  const handleGoogleRegister = () => {
-    router.replace('/(tabs)/home');
+  const handleGoogleRegister = async () => {
+    setApiError('');
+
+    try {
+      console.log('Start google log in');
+      await loginWithGoogle();
+    } catch (error: any) {
+      console.log('Google error: ', error);
+      setApiError('Log in with Google Failed.');
+    }
   };
 
   const handleLoginButton = () => {
@@ -135,6 +152,11 @@ export default function LoginScreen() {
               </View>
             </View>
             <View style={styles.bottomSection}>
+              {apiError ? (
+                <Text style={[styles.errorText, { textAlign: 'center', marginBottom: 10 }]}>
+                  {apiError}
+                </Text>
+              ) : null}
               <CustomButton title="Zarejestruj się" iconName="user" onPress={handleRegisterMock} />
               <GoogleSignInButton onPress={handleGoogleRegister} />
 
