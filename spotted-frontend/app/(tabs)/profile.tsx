@@ -5,20 +5,20 @@ import { Colors } from '@/constants/theme';
 import { mockCurrentUser } from '@/constants/user-data';
 import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useImagePicker } from '@/hooks/use-image-picker';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'expo-router';
+import AvatarProgress from '@/components/avatar-progress';
 
 export default function Profile() {
   const { imageUri, pickImage } = useImagePicker();
   const [apiError, setApiError] = useState('');
 
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const router = useRouter();
-
 
   const handleLogOut = async () => {
     setApiError('');
@@ -43,32 +43,23 @@ export default function Profile() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* Profil Image Container */}
           <View style={styles.profileImageContainer}>
-            <View style={styles.imageWrapper}>
-              <Image
-                source={imageUri ? { uri: imageUri } : require('@/assets/images/pfp.jpg')}
-                style={styles.profileImage}
-              />
-              <Pressable style={styles.editIconContainer} onPress={() => pickImage(true)}>
-                <Feather name={'camera'} size={18} color={Colors.white} />
-              </Pressable>
-            </View>
-          </View>
+            <AvatarProgress
+              imageUrl={user?.avatar}
+              currentPoints={mockCurrentUser.reputationScore}
+              maxPoints={2000}
+              onEditPress={() => pickImage(true)}
+            />
 
-          {/* User Data Section */}
-          <View style={styles.nameRoleContainer}>
             <View style={styles.nameRow}>
-              <Text style={styles.name}>{mockCurrentUser.username}</Text>
+              <Text style={styles.name}>{user?.firstName || 'Nowy Użytkownik'}</Text>
               <Pressable onPress={() => console.log('Edycja nicku')} style={styles.nameEditBtn}>
                 <Feather name="edit-2" size={SIZES.icon_sm} color={Colors.textMuted} />
               </Pressable>
             </View>
 
-            <Text style={styles.role}>{mockCurrentUser.trustLevel}</Text>
-            <ProgressBar
-              currentPoints={mockCurrentUser.reputationScore}
-              maxPoints={2000}
-              nextRank="Lokalny Strażnik"
-            />
+            <Text style={styles.role}>
+              Lokalny Strażnik • {mockCurrentUser.reputationScore} / 2000 pkt
+            </Text>
           </View>
 
           {/* STATS CARD */}
@@ -128,7 +119,7 @@ export default function Profile() {
               </View>
               <View style={styles.menuItemRight}>
                 <Text style={[styles.menuItemValue, { color: Colors.textMuted }]}>
-                  {mockCurrentUser.email}
+                  {user?.email}
                 </Text>
               </View>
             </View>
@@ -154,7 +145,8 @@ const styles = StyleSheet.create({
   },
   profileImageContainer: {
     alignItems: 'center',
-    marginTop: SIZES.md
+    marginTop: SIZES.lg,
+    marginBottom: SIZES.xl
   },
   imageWrapper: {
     position: 'relative'
@@ -186,13 +178,13 @@ const styles = StyleSheet.create({
   name: {
     fontSize: SIZES.h2,
     fontWeight: 'bold',
-    color: Colors.primary,
-    marginBottom: SIZES.xs
+    color: Colors.primary
   },
   role: {
-    fontSize: SIZES.body_md,
+    fontSize: SIZES.body_sm,
     color: '#64748B',
-    fontWeight: '500'
+    fontWeight: '500',
+    marginTop: SIZES.xs
   },
   inputFieldsContainer: {
     marginTop: SIZES.sm,
@@ -205,7 +197,8 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    marginTop: SIZES.md
   },
   nameEditBtn: {
     marginLeft: SIZES.sm,
