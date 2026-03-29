@@ -19,6 +19,8 @@ export interface User {
   selectedCity?: {
     name: string;
     voivodeship: string;
+    latitude: number;
+    longitude: number;
   } | null;
 }
 
