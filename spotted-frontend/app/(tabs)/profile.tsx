@@ -1,8 +1,6 @@
 import CustomButton from '@/components/custom-button';
-import ProgressBar from '@/components/progress-bar';
 import { SIZES } from '@/constants/sizes';
 import { Colors } from '@/constants/theme';
-import { mockCurrentUser } from '@/constants/user-data';
 import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
@@ -12,26 +10,30 @@ import { useImagePicker } from '@/hooks/use-image-picker';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'expo-router';
 import AvatarProgress from '@/components/avatar-progress';
+import { apiClient } from '@/constants/api';
+import CityPickerModal from '@/components/city-picker-modal';
+import { supabase } from '@/utils/supabase';
+import { useProfile } from '@/hooks/use-profile';
+const getTrustLevel = (score: number) => {
+  if (score >= 1000) return 'Ekspert Lojalny';
+  if (score >= 500) return 'Zaufany';
+  return 'Nowicjusz';
+};
 
 export default function Profile() {
-  const { imageUri, pickImage } = useImagePicker();
-  const [apiError, setApiError] = useState('');
-
-  const { logout, user } = useAuth();
-  const router = useRouter();
-
-  const handleLogOut = async () => {
-    setApiError('');
-
-    try {
-      console.log('Log out');
-      await logout();
-
-      router.replace('/login');
-    } catch (error: any) {
-      console.log('Logout error:', error);
-    }
-  };
+  const {
+    user,
+    currentScore,
+    currentTrustLevel,
+    currentCityName,
+    apiError,
+    isCityModalVisible,
+    setCityModalVisible,
+    isUploading,
+    handleLogOut,
+    handleCitySelect,
+    handlePickAndUploadAvatar
+  } = useProfile();
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -45,9 +47,9 @@ export default function Profile() {
           <View style={styles.profileImageContainer}>
             <AvatarProgress
               imageUrl={user?.avatar}
-              currentPoints={mockCurrentUser.reputationScore}
+              currentPoints={currentScore}
               maxPoints={2000}
-              onEditPress={() => pickImage(true)}
+              onEditPress={handlePickAndUploadAvatar}
             />
 
             <View style={styles.nameRow}>
@@ -58,24 +60,25 @@ export default function Profile() {
             </View>
 
             <Text style={styles.role}>
-              Lokalny Strażnik • {mockCurrentUser.reputationScore} / 2000 pkt
+              {currentTrustLevel} • {currentScore} / 2000 pkt
             </Text>
           </View>
 
           {/* STATS CARD */}
           <View style={styles.statsCard}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{mockCurrentUser.stats.reportsAdded}</Text>
+              <Text style={styles.statValue}>{user?.reputation?.totalPosts ?? 0}</Text>
               <Text style={styles.statLabel}>Zgłoszenia</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{mockCurrentUser.stats.upvotesReceived}</Text>
+              <Text style={styles.statValue}>{user?.reputation?.totalUpvotes ?? 0}</Text>
               <Text style={styles.statLabel}>Otrzymane 👍</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{mockCurrentUser.stats.commentsAdded}</Text>
+              {/* Lack */}
+              <Text style={styles.statValue}>0</Text>
               <Text style={styles.statLabel}>Komentarze</Text>
             </View>
           </View>
@@ -83,13 +86,13 @@ export default function Profile() {
           {/* MENU CARD */}
           <View style={styles.menuCard}>
             {/* CITY */}
-            <Pressable style={styles.menuItem} onPress={() => console.log('zmiana miasta')}>
+            <Pressable style={styles.menuItem} onPress={() => setCityModalVisible(true)}>
               <View style={styles.menuItemLeft}>
                 <Feather name="map-pin" size={SIZES.icon_md} color={Colors.primary} />
                 <Text style={styles.menuItemLabel}>Moje miasto</Text>
               </View>
               <View style={styles.menuItemRight}>
-                <Text style={styles.menuItemValue}>{mockCurrentUser.city}</Text>
+                <Text style={styles.menuItemValue}>{currentCityName}</Text>
                 <Feather name="chevron-right" size={SIZES.icon_sm} color={Colors.textMuted} />
               </View>
             </Pressable>
@@ -131,6 +134,11 @@ export default function Profile() {
           </View>
         </ScrollView>
       </LinearGradient>
+      <CityPickerModal
+        visible={isCityModalVisible}
+        onClose={() => setCityModalVisible(false)}
+        onSelectCity={handleCitySelect}
+      />
     </SafeAreaView>
   );
 }

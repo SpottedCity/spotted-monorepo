@@ -46,8 +46,10 @@ Edytuj `.env` i ustaw wartości:
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/spotted_db"
 JWT_SECRET="your-super-secret-jwt-key"
+SUPABASE_JWT_SECRET="jwt-secret-supabase"
 SUPABASE_URL="https://your-project.supabase.co"
-SUPABASE_KEY="your-supabase-key"
+SUPABASE_SERVICE_ROLE_KEY="ke"
+SUPABASE_BUCKET="bucket"
 ```
 
 ### 4. Generowanie Prisma Client
