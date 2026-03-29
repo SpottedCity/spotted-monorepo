@@ -133,6 +133,78 @@ async function main() {
   }
 
   console.log('Seeding completed.');
+
+
+const testUser = await prisma.user.findFirst();
+  
+  if (!testUser) {
+    console.log('⚠️ Błąd: Nie znaleziono użytkownika!');
+  } else {
+    console.log(`✅ Znaleziono użytkownika: ${testUser.id}. Przystępuję do tworzenia postów...`);
+    
+    // 2. Pobieramy potrzebne kategorie
+    const wypadekCat = await prisma.category.findUnique({ where: { slug: 'wypadek' } });
+    const usterkaCat = await prisma.category.findUnique({ where: { slug: 'usterka' } });
+    const zgubaCat = await prisma.category.findUnique({ where: { slug: 'zguba' } });
+
+    // 3. Pobieramy miasta
+    const bydgoszcz = await prisma.city.findUnique({ where: { name: 'Bydgoszcz' } });
+    const warszawa = await prisma.city.findUnique({ where: { name: 'Warszawa' } });
+
+    console.log(`Bydgoszcz ID: ${bydgoszcz?.id}, Warszawa ID: ${warszawa?.id}`);
+
+    // 4. Tworzymy przykładowe posty
+    if (bydgoszcz && wypadekCat) {
+      await prisma.post.create({
+        data: {
+          title: 'Stłuczka na Rondzie Jagiellonów',
+          description: 'Zderzenie dwóch osobówek, zablokowany jeden pas. Uważajcie na korki!',
+          latitude: 53.1215,
+          longitude: 18.0134,
+          authorId: testUser.id,
+          cityId: bydgoszcz.id,
+          categoryId: wypadekCat.id,
+          upvotes: 12,
+        },
+      });
+      console.log('✅ Dodano post: Wypadek Bydgoszcz');
+    }
+
+    if (bydgoszcz && usterkaCat) {
+      await prisma.post.create({
+        data: {
+          title: 'Awaria świateł na Focha',
+          description: 'Sygnalizacja świetlna całkowicie padła, ruchem kieruje policja.',
+          latitude: 53.1245,
+          longitude: 17.9980,
+          authorId: testUser.id,
+          cityId: bydgoszcz.id,
+          categoryId: usterkaCat.id,
+          upvotes: 5,
+        },
+      });
+      console.log('✅ Dodano post: Usterka Bydgoszcz');
+    }
+
+    if (warszawa && zgubaCat) {
+      await prisma.post.create({
+        data: {
+          title: 'Zaginął mały piesek (Mokotów)',
+          description: 'Rudy kundelek, ma na sobie czerwoną obrożę. Uciekł w stronę parku.',
+          latitude: 52.2052,
+          longitude: 21.0133,
+          authorId: testUser.id,
+          cityId: warszawa.id,
+          categoryId: zgubaCat.id,
+          upvotes: 24,
+        },
+      });
+      console.log('✅ Dodano post: Zguba Warszawa');
+    }
+  }
+
+  // TEN NAPIS MUSI BYĆ NA SAMYM KOŃCU!
+  console.log('🚀 Seeding całkowicie zakończony.');
 }
 
 main()
@@ -143,3 +215,5 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+

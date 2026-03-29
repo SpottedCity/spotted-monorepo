@@ -4,6 +4,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Request
 } from '@nestjs/common';
 import { VotesService } from './votes.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -13,13 +14,15 @@ import { UserId } from '../common/decorators/user.decorator';
 export class VotesController {
   constructor(private votesService: VotesService) {}
 
-  @Post('post/:postId')
+@Post('post/:postId')
   @UseGuards(JwtAuthGuard)
   async voteOnPost(
     @Param('postId') postId: string,
     @Body() body: { value: number },
-    @UserId() userId: string,
+    @Request() req: any,
   ) {
+    const userId = req.user?.id || req.user?.sub;
+    
     return this.votesService.voteOnPost(userId, postId, body.value);
   }
 
