@@ -9,12 +9,17 @@ export const useImagePicker = (initialImage: string | null = null) => {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: circular ? [1, 1] : [4, 3],
-      quality: 0.8,
+      quality: 0.8
     });
 
     if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setImageUri(uri);
+
+      return uri;
     }
+
+    return null;
   };
 
   const clearImage = () => setImageUri(null);

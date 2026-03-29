@@ -9,6 +9,17 @@ export interface User {
   firstName?: string;
   lastName?: string;
   avatar?: string;
+  // NOWE POLA Z BACKENDU:
+  reputation?: {
+    score: number;
+    totalPosts: number;
+    totalUpvotes: number;
+    totalDownvotes: number;
+  };
+  selectedCity?: {
+    name: string;
+    voivodeship: string;
+  } | null;
 }
 
 interface AuthContextType {
@@ -18,6 +29,7 @@ interface AuthContextType {
   register: (email: string, password: string, username: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,6 +89,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const refreshUser = async () => {
+    try {
+      const response = await apiClient.get('/auth/me');
+      setUser(response.data);
+    } catch (error) {
+      console.error('Błąd podczas odświeżania profilu:', error);
+    }
+  };
+
   const loginWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -92,7 +113,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, loginWithGoogle, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, loginWithGoogle, register, logout, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

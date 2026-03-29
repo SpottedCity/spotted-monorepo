@@ -1,37 +1,39 @@
 import CustomButton from '@/components/custom-button';
-import ProgressBar from '@/components/progress-bar';
 import { SIZES } from '@/constants/sizes';
 import { Colors } from '@/constants/theme';
-import { mockCurrentUser } from '@/constants/user-data';
 import Feather from '@expo/vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useImagePicker } from '@/hooks/use-image-picker';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'expo-router';
+import AvatarProgress from '@/components/avatar-progress';
+import { apiClient } from '@/constants/api';
+import CityPickerModal from '@/components/city-picker-modal';
+import { supabase } from '@/utils/supabase';
+import { useProfile } from '@/hooks/use-profile';
+const getTrustLevel = (score: number) => {
+  if (score >= 1000) return 'Ekspert Lojalny';
+  if (score >= 500) return 'Zaufany';
+  return 'Nowicjusz';
+};
 
 export default function Profile() {
-  const { imageUri, pickImage } = useImagePicker();
-  const [apiError, setApiError] = useState('');
-
-  const { logout } = useAuth();
-  const router = useRouter();
-
-
-  const handleLogOut = async () => {
-    setApiError('');
-
-    try {
-      console.log('Log out');
-      await logout();
-
-      router.replace('/login');
-    } catch (error: any) {
-      console.log('Logout error:', error);
-    }
-  };
+  const {
+    user,
+    currentScore,
+    currentTrustLevel,
+    currentCityName,
+    apiError,
+    isCityModalVisible,
+    setCityModalVisible,
+    isUploading,
+    handleLogOut,
+    handleCitySelect,
+    handlePickAndUploadAvatar
+  } = useProfile();
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -43,48 +45,40 @@ export default function Profile() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* Profil Image Container */}
           <View style={styles.profileImageContainer}>
-            <View style={styles.imageWrapper}>
-              <Image
-                source={imageUri ? { uri: imageUri } : require('@/assets/images/pfp.jpg')}
-                style={styles.profileImage}
-              />
-              <Pressable style={styles.editIconContainer} onPress={() => pickImage(true)}>
-                <Feather name={'camera'} size={18} color={Colors.white} />
-              </Pressable>
-            </View>
-          </View>
+            <AvatarProgress
+              imageUrl={user?.avatar}
+              currentPoints={currentScore}
+              maxPoints={2000}
+              onEditPress={handlePickAndUploadAvatar}
+            />
 
-          {/* User Data Section */}
-          <View style={styles.nameRoleContainer}>
             <View style={styles.nameRow}>
-              <Text style={styles.name}>{mockCurrentUser.username}</Text>
+              <Text style={styles.name}>{user?.firstName || 'Nowy Użytkownik'}</Text>
               <Pressable onPress={() => console.log('Edycja nicku')} style={styles.nameEditBtn}>
                 <Feather name="edit-2" size={SIZES.icon_sm} color={Colors.textMuted} />
               </Pressable>
             </View>
 
-            <Text style={styles.role}>{mockCurrentUser.trustLevel}</Text>
-            <ProgressBar
-              currentPoints={mockCurrentUser.reputationScore}
-              maxPoints={2000}
-              nextRank="Lokalny Strażnik"
-            />
+            <Text style={styles.role}>
+              {currentTrustLevel} • {currentScore} / 2000 pkt
+            </Text>
           </View>
 
           {/* STATS CARD */}
           <View style={styles.statsCard}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{mockCurrentUser.stats.reportsAdded}</Text>
+              <Text style={styles.statValue}>{user?.reputation?.totalPosts ?? 0}</Text>
               <Text style={styles.statLabel}>Zgłoszenia</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{mockCurrentUser.stats.upvotesReceived}</Text>
+              <Text style={styles.statValue}>{user?.reputation?.totalUpvotes ?? 0}</Text>
               <Text style={styles.statLabel}>Otrzymane 👍</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{mockCurrentUser.stats.commentsAdded}</Text>
+              {/* Lack */}
+              <Text style={styles.statValue}>0</Text>
               <Text style={styles.statLabel}>Komentarze</Text>
             </View>
           </View>
@@ -92,13 +86,13 @@ export default function Profile() {
           {/* MENU CARD */}
           <View style={styles.menuCard}>
             {/* CITY */}
-            <Pressable style={styles.menuItem} onPress={() => console.log('zmiana miasta')}>
+            <Pressable style={styles.menuItem} onPress={() => setCityModalVisible(true)}>
               <View style={styles.menuItemLeft}>
                 <Feather name="map-pin" size={SIZES.icon_md} color={Colors.primary} />
                 <Text style={styles.menuItemLabel}>Moje miasto</Text>
               </View>
               <View style={styles.menuItemRight}>
-                <Text style={styles.menuItemValue}>{mockCurrentUser.city}</Text>
+                <Text style={styles.menuItemValue}>{currentCityName}</Text>
                 <Feather name="chevron-right" size={SIZES.icon_sm} color={Colors.textMuted} />
               </View>
             </Pressable>
@@ -128,7 +122,7 @@ export default function Profile() {
               </View>
               <View style={styles.menuItemRight}>
                 <Text style={[styles.menuItemValue, { color: Colors.textMuted }]}>
-                  {mockCurrentUser.email}
+                  {user?.email}
                 </Text>
               </View>
             </View>
@@ -140,6 +134,11 @@ export default function Profile() {
           </View>
         </ScrollView>
       </LinearGradient>
+      <CityPickerModal
+        visible={isCityModalVisible}
+        onClose={() => setCityModalVisible(false)}
+        onSelectCity={handleCitySelect}
+      />
     </SafeAreaView>
   );
 }
@@ -154,7 +153,8 @@ const styles = StyleSheet.create({
   },
   profileImageContainer: {
     alignItems: 'center',
-    marginTop: SIZES.md
+    marginTop: SIZES.lg,
+    marginBottom: SIZES.xl
   },
   imageWrapper: {
     position: 'relative'
@@ -186,13 +186,13 @@ const styles = StyleSheet.create({
   name: {
     fontSize: SIZES.h2,
     fontWeight: 'bold',
-    color: Colors.primary,
-    marginBottom: SIZES.xs
+    color: Colors.primary
   },
   role: {
-    fontSize: SIZES.body_md,
+    fontSize: SIZES.body_sm,
     color: '#64748B',
-    fontWeight: '500'
+    fontWeight: '500',
+    marginTop: SIZES.xs
   },
   inputFieldsContainer: {
     marginTop: SIZES.sm,
@@ -205,7 +205,8 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    marginTop: SIZES.md
   },
   nameEditBtn: {
     marginLeft: SIZES.sm,

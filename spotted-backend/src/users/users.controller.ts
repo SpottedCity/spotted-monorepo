@@ -9,6 +9,7 @@ import {
   Query,
   DefaultValuePipe,
   ParseIntPipe,
+  Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -31,9 +32,9 @@ export class UsersController {
 
   @Get(':id/posts')
   async getUserPosts(
-      @Param('id') id: string,
-      @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-      @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
+    @Param('id') id: string,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
   ) {
     return this.usersService.getUserPosts(id, limit, skip);
   }
@@ -41,13 +42,17 @@ export class UsersController {
   @Put(':id')
   @UseGuards(JwtAuthGuard)
   async updateUserProfile(
-      @Param('id') id: string,
-      @Body() updateUserDto: UpdateUserDto,
-      @UserId() userId: string,
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @Request() req: any,
   ) {
-    if (userId !== id) {
+    const loggedInUserId = req.user.id;
+    const loggedInSupabaseId = req.user.supabaseId || req.user.sub;
+
+    if (id !== loggedInUserId && id !== loggedInSupabaseId) {
       throw new ForbiddenException('You can only update your own profile');
     }
-    return this.usersService.updateUserProfile(id, updateUserDto);
+
+    return this.usersService.updateUserProfile(loggedInUserId, updateUserDto);
   }
 }

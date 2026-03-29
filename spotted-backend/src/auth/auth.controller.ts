@@ -1,16 +1,21 @@
 import { Controller, Get, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-
+import { PrismaService } from '../prisma/prisma.service';
 @Controller('auth')
 export class AuthController {
-  
-  // This endpoint leverages JwtAuthGuard to trigger JwtStrategy.
-  // Because our JwtStrategy implements JIT provisioning, 
-  // hitting this endpoint will either verify an existing user or create a new one,
-  // returning the synced Prisma user object in req.user.
+  constructor(private prisma: PrismaService) {} 
+
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  getProfile(@Request() req: any) {
-    return req.user;
+  async getProfile(@Request() req: any) {
+    const fullProfile = await this.prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: {
+        reputation: true,
+        selectedCity: true,
+      },
+    });
+
+    return fullProfile;
   }
 }
