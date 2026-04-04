@@ -1,11 +1,17 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { FlagReason } from '@prisma/client';
 
 export class CreateFlagDto {
+  @IsOptional()
   @IsString()
-  postId: string;
+  postId?: string;
 
+  @IsOptional()
   @IsString()
-  reason: string;
+  commentId?: string;
+
+  @IsEnum(FlagReason)
+  reason: FlagReason;
 
   @IsOptional()
   @IsString()

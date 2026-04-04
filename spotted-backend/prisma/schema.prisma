@@ -10,6 +10,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
 // User model
 model User {
   id        String   @id @default(cuid())
@@ -19,31 +25,38 @@ model User {
   lastName  String?
   avatar    String?
   bio       String?
-
+  role             UserRole @default(USER)
+  reputationScore  Int      @default(0)
+  penaltyPoints    Int      @default(0)
+  moderatorSince   DateTime?
   // OAuth
   googleId  String?  @unique
-  
+
   // Supabase Auth
-  supabaseId String? @unique
+  supabaseId    String? @unique
   emailVerified Boolean @default(false)
-  
+
   // User preferences
   selectedCityId String?
-  selectedCity   City?     @relation("UserSelectedCity", fields: [selectedCityId], references: [id])
+  selectedCity   City? @relation("UserSelectedCity", fields: [selectedCityId], references: [id])
 
   // Relations
-  posts     Post[]
-  comments  Comment[]
-  votes     Vote[]
-  reputation UserReputation?
-  flags     Flag[]
+  posts         Post[]
+  comments      Comment[]
+  votes         Vote[]
+  reputation    UserReputation?
+  flags         Flag[]
   subscriptions Subscription[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+  isBanned     Boolean   @default(false)
+  bannedAt     DateTime?
+  bannedReason String?
+  bannedById   String?
   @@index([email])
   @@index([googleId])
+  @@index([role])
 }
 
 // Cities and regions
@@ -82,6 +95,20 @@ model Category {
   @@index([slug])
 }
 
+enum PostModerationStatus {
+  ACTIVE
+  HIDDEN_BY_REPORTS
+  REMOVED_BY_MODERATOR
+  RESTORED
+}
+
+enum CommentModerationStatus {
+  ACTIVE
+  HIDDEN_BY_REPORTS
+  REMOVED_BY_MODERATOR
+  RESTORED
+}
+
 // Main Post/Report model
 model Post {
   id        String   @id @default(cuid())
@@ -111,11 +138,17 @@ model Post {
   downvotes Int      @default(0)
   
   // Status
-  isActive  Boolean  @default(true)
-  isPinned  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  expiresAt DateTime? // For auto-expiring posts
+    isActive         Boolean              @default(true)
+    isPinned         Boolean              @default(false)
+    moderationStatus PostModerationStatus @default(ACTIVE)
+    reportCount      Int                  @default(0)
+    reportScore      Int                  @default(0)
+    moderatedAt      DateTime?
+    moderatedById    String?
+    moderationReason String?
+    createdAt        DateTime             @default(now())
+    updatedAt        DateTime             @updatedAt
+    expiresAt        DateTime?
 
   // Relations
   comments  Comment[]
@@ -151,9 +184,21 @@ model Comment {
   // Votes
   votes     Vote[]
 
+  // Flags
+  flags     Flag[]
+
   // Stats
   upvotes   Int       @default(0)
   downvotes Int       @default(0)
+
+  // Moderation
+  isActive         Boolean                 @default(true)
+  moderationStatus CommentModerationStatus @default(ACTIVE)
+  reportCount      Int                     @default(0)
+  reportScore      Int                     @default(0)
+  moderatedAt      DateTime?
+  moderatedById    String?
+  moderationReason String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -161,6 +206,8 @@ model Comment {
   @@index([authorId])
   @@index([postId])
   @@index([parentId])
+  @@index([isActive])
+  @@index([moderationStatus])
 }
 
 // Votes on posts and comments
@@ -207,26 +254,50 @@ model UserReputation {
   @@index([score])
 }
 
+enum FlagReason {
+  SPAM
+  NUDITY
+  VIOLENCE
+  HATE
+  HARASSMENT
+  FALSE_INFO
+  OTHER
+}
+
+enum FlagStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
 // Flags/Reports for inappropriate content
 model Flag {
-  id        String   @id @default(cuid())
-  
-  reporterId String
-  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  id          String     @id @default(cuid())
 
-  postId    String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporterId  String
+  reporter    User       @relation(fields: [reporterId], references: [id], onDelete: Cascade)
 
-  reason    String   // e.g., "spam", "inappropriate", "false_information"
+  postId      String?
+  post        Post?      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  commentId   String?
+  comment     Comment?   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  reason      FlagReason
   description String?
+  weight      Int        @default(1)
 
-  status    String   @default("pending") // pending, resolved, dismissed
-  resolvedBy String?
+  status      FlagStatus @default(PENDING)
+  resolvedBy  String?
+  resolvedAt  DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
+  @@unique([postId, reporterId])
+  @@unique([commentId, reporterId])
   @@index([postId])
+  @@index([commentId])
   @@index([reporterId])
   @@index([status])
 }

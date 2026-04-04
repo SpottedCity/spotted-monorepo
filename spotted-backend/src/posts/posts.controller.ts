@@ -12,6 +12,7 @@ import {
 import { PostsService } from './posts.service';
 import { CreatePostDto, UpdatePostDto } from './dto/create-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { NotBannedGuard } from '../auth/guards/not-banned.guard';
 import { UserId } from '../common/decorators/user.decorator';
 
 @Controller('posts')
@@ -19,7 +20,7 @@ export class PostsController {
   constructor(private postsService: PostsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, NotBannedGuard)
   async createPost(@Body() createPostDto: CreatePostDto, @UserId() userId: string) {
     return this.postsService.createPost(userId, createPostDto);
   }
@@ -33,8 +34,8 @@ export class PostsController {
   ) {
     return this.postsService.getPostsByCity(
         cityId,
-        limit ? parseInt(limit) : 20,
-        skip ? parseInt(skip) : 0,
+        limit ? parseInt(limit, 10) : 20,
+        skip ? parseInt(skip, 10) : 0,
         categoryId,
     );
   }
@@ -50,7 +51,7 @@ export class PostsController {
         latitude ? parseFloat(latitude) : 0,
         longitude ? parseFloat(longitude) : 0,
         radius ? parseFloat(radius) : 5,
-        limit ? parseInt(limit) : 20,
+        limit ? parseInt(limit, 10) : 20,
     );
   }
 
@@ -60,17 +61,17 @@ export class PostsController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, NotBannedGuard)
   async updatePost(
-    @Param('id') id: string,
-    @Body() updatePostDto: UpdatePostDto,
-    @UserId() userId: string,
+      @Param('id') id: string,
+      @Body() updatePostDto: UpdatePostDto,
+      @UserId() userId: string,
   ) {
     return this.postsService.updatePost(id, userId, updatePostDto);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, NotBannedGuard)
   async deletePost(@Param('id') id: string, @UserId() userId: string) {
     return this.postsService.deletePost(id, userId);
   }

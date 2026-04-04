@@ -13,6 +13,7 @@ import { VotesModule } from './votes/votes.module';
 import { FlagsModule } from './flags/flags.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { ModerationModule } from './moderation/moderation.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { UploadsModule } from './uploads/uploads.module';
     FlagsModule,
     SubscriptionsModule,
     UploadsModule,
+    ModerationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

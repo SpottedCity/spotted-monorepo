@@ -1,27 +1,74 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import {
+  applyUserScoreDelta,
+  syncUserRoleAndBan,
+} from '../common/reputation/reputation.helpers';
 
 @Injectable()
 export class CommentsService {
   constructor(private prisma: PrismaService) {}
 
   async createComment(authorId: string, createCommentDto: CreateCommentDto) {
-    return this.prisma.comment.create({
-      data: {
-        ...createCommentDto,
-        authorId,
-      },
-      include: {
-        author: {
+    return this.prisma.$transaction(async (tx) => {
+      const post = await tx.post.findUnique({
+        where: { id: createCommentDto.postId },
+        select: {
+          id: true,
+          isActive: true,
+        },
+      });
+
+      if (!post || !post.isActive) {
+        throw new NotFoundException('Post not found');
+      }
+
+      if (createCommentDto.parentId) {
+        const parent = await tx.comment.findUnique({
+          where: { id: createCommentDto.parentId },
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
-            avatar: true,
+            postId: true,
+            isActive: true,
+          },
+        });
+
+        if (!parent || !parent.isActive) {
+          throw new NotFoundException('Parent comment not found');
+        }
+
+        if (parent.postId !== createCommentDto.postId) {
+          throw new BadRequestException('Parent comment belongs to another post');
+        }
+      }
+
+      const comment = await tx.comment.create({
+        data: {
+          ...createCommentDto,
+          authorId,
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
+            },
           },
         },
-      },
+      });
+
+      await applyUserScoreDelta(tx, authorId, 3, 0);
+      await syncUserRoleAndBan(tx, authorId);
+
+      return comment;
     });
   }
 
@@ -29,7 +76,8 @@ export class CommentsService {
     return this.prisma.comment.findMany({
       where: {
         postId,
-        parentId: null, // Only top-level comments
+        parentId: null,
+        isActive: true,
       },
       skip,
       take: limit,
@@ -43,6 +91,9 @@ export class CommentsService {
           },
         },
         replies: {
+          where: {
+            isActive: true,
+          },
           include: {
             author: {
               select: {
@@ -65,7 +116,7 @@ export class CommentsService {
       where: { id: commentId },
     });
 
-    if (!comment) {
+    if (!comment || !comment.isActive) {
       throw new NotFoundException('Comment not found');
     }
 
@@ -80,20 +131,31 @@ export class CommentsService {
   }
 
   async deleteComment(commentId: string, authorId: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id: commentId },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const comment = await tx.comment.findUnique({
+        where: { id: commentId },
+        select: {
+          id: true,
+          authorId: true,
+        },
+      });
 
-    if (!comment) {
-      throw new NotFoundException('Comment not found');
-    }
+      if (!comment) {
+        throw new NotFoundException('Comment not found');
+      }
 
-    if (comment.authorId !== authorId) {
-      throw new ForbiddenException('You can only delete your own comments');
-    }
+      if (comment.authorId !== authorId) {
+        throw new ForbiddenException('You can only delete your own comments');
+      }
 
-    return this.prisma.comment.delete({
-      where: { id: commentId },
+      const deleted = await tx.comment.delete({
+        where: { id: commentId },
+      });
+
+      await applyUserScoreDelta(tx, authorId, -3, 0);
+      await syncUserRoleAndBan(tx, authorId);
+
+      return deleted;
     });
   }
 }

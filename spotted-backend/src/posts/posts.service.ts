@@ -1,45 +1,53 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostDto, UpdatePostDto } from './dto/create-post.dto';
+import {
+  applyUserScoreDelta,
+  syncUserRoleAndBan,
+} from '../common/reputation/reputation.helpers';
 
 @Injectable()
 export class PostsService {
   constructor(private prisma: PrismaService) {}
 
   async createPost(authorId: string, createPostDto: CreatePostDto) {
-    const post = await this.prisma.post.create({
-      data: {
-        ...createPostDto,
-        authorId,
-      },
-      include: {
-        author: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            avatar: true,
+    return this.prisma.$transaction(async (tx) => {
+      const post = await tx.post.create({
+        data: {
+          ...createPostDto,
+          authorId,
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
+            },
+          },
+          category: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              color: true,
+            },
           },
         },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            color: true,
-          },
-        },
-      },
-    });
+      });
 
-    // Update user reputation - increment total posts
-    await this.prisma.userReputation.update({
-      where: { userId: authorId },
-      data: { totalPosts: { increment: 1 } },
-    });
+      await tx.userReputation.update({
+        where: { userId: authorId },
+        data: { totalPosts: { increment: 1 } },
+      });
 
-    return post;
+      await applyUserScoreDelta(tx, authorId, 5, 0);
+      await syncUserRoleAndBan(tx, authorId);
+
+      return post;
+    });
   }
 
   async getPostById(id: string) {
@@ -65,6 +73,13 @@ export class PostsService {
           },
         },
         comments: {
+          where: {
+            isActive: true,
+            parentId: null,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
           select: {
             id: true,
             content: true,
@@ -79,6 +94,29 @@ export class PostsService {
                 avatar: true,
               },
             },
+            replies: {
+              where: {
+                isActive: true,
+              },
+              orderBy: {
+                createdAt: 'asc',
+              },
+              select: {
+                id: true,
+                content: true,
+                upvotes: true,
+                downvotes: true,
+                createdAt: true,
+                author: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -86,10 +124,10 @@ export class PostsService {
   }
 
   async getPostsByCity(
-    cityId: string,
-    limit = 20,
-    skip = 0,
-    categoryId?: string,
+      cityId: string,
+      limit = 20,
+      skip = 0,
+      categoryId?: string,
   ) {
     return this.prisma.post.findMany({
       where: {
@@ -122,13 +160,11 @@ export class PostsService {
   }
 
   async getNearbyPosts(
-    latitude: number,
-    longitude: number,
-    radiusKm = 5,
-    limit = 20,
+      latitude: number,
+      longitude: number,
+      radiusKm = 5,
+      limit = 20,
   ) {
-    // Simple distance calculation using Haversine formula
-    // For production, implement PostGIS queries for better performance
     const posts = await this.prisma.post.findMany({
       where: {
         isActive: true,
@@ -150,16 +186,15 @@ export class PostsService {
           },
         },
       },
-      take: limit * 2, // Get more to filter by distance
+      take: limit * 2,
     });
 
-    // Filter by distance
     const nearby = posts.filter((post) => {
       const distance = this.calculateDistance(
-        latitude,
-        longitude,
-        post.latitude,
-        post.longitude,
+          latitude,
+          longitude,
+          post.latitude,
+          post.longitude,
       );
       return distance <= radiusKm;
     });
@@ -168,9 +203,9 @@ export class PostsService {
   }
 
   async updatePost(
-    postId: string,
-    authorId: string,
-    updatePostDto: UpdatePostDto,
+      postId: string,
+      authorId: string,
+      updatePostDto: UpdatePostDto,
   ) {
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
@@ -212,23 +247,30 @@ export class PostsService {
       throw new ForbiddenException('You can only delete your own posts');
     }
 
-    return this.prisma.post.delete({
-      where: { id: postId },
+    return this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.post.delete({
+        where: { id: postId },
+      });
+
+      await applyUserScoreDelta(tx, authorId, -5, 0);
+      await syncUserRoleAndBan(tx, authorId);
+
+      return deleted;
     });
   }
 
   private calculateDistance(
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number,
+      lat1: number,
+      lon1: number,
+      lat2: number,
+      lon2: number,
   ): number {
-    const R = 6371; // Earth's radius in kilometers
+    const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
         Math.cos((lat2 * Math.PI) / 180) *
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
