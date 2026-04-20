@@ -8,6 +8,8 @@ import { mockReports } from '@/constants/map-data';
 import { useProfile } from '@/hooks/use-profile';
 import { useAuth } from '@/context/auth-context';
 import { useNearbyPosts } from '@/hooks/use-nearby-posts';
+import { getCategoryIcon } from '@/utils/mapMarkers';
+import { useLocation } from '@/hooks/useLocation';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -24,8 +26,13 @@ const MapUpdater = ({ center }: { center: [number, number] }) => {
   return null;
 };
 
-const LeafletMap = () => {
+interface LeafletMapProps {
+  filterCategoryId?: string | null;
+}
+
+const LeafletMap = ({ filterCategoryId }: LeafletMapProps) => {
   const { user } = useAuth();
+  const { location: gpsLocation } = useLocation();
 
   const polandBounds: L.LatLngBoundsExpression = [
     [48.8, 14.0],
@@ -35,11 +42,13 @@ const LeafletMap = () => {
   const defaultLat = 52.0693;
   const defaultLng = 19.4803;
 
-  const lat = user?.selectedCity?.latitude || defaultLat;
-  const lng = user?.selectedCity?.longitude || defaultLng;
+  const lat = gpsLocation?.latitude || user?.selectedCity?.latitude || defaultLat;
+  const lng = gpsLocation?.longitude || user?.selectedCity?.longitude || defaultLng;
   const mapCenter: [number, number] = [lat, lng];
 
   const { posts, isLoading } = useNearbyPosts(lat, lng, 20);
+
+  const filteredPosts = posts.filter(p => !filterCategoryId || p.category.id === filterCategoryId);
 
   return (
     <Map
@@ -58,11 +67,14 @@ const LeafletMap = () => {
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       />
       {!isLoading &&
-        posts.map((post) => (
-          <Marker key={post.id} position={[post.latitude, post.longitude]}>
+        filteredPosts.map((post) => {
+          const icon = typeof window !== 'undefined' ? getCategoryIcon(post.category.slug) : undefined;
+          return (
+          <Marker key={post.id} position={[post.latitude, post.longitude]} icon={icon}>     
             <ReportPopup report={post} />
           </Marker>
-        ))}
+          );
+        })}
     </Map>
   );
 };

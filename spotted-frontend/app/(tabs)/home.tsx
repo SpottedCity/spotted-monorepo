@@ -1,13 +1,13 @@
 import React, { Suspense, useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View, ScrollView, Pressable } from 'react-native';
+import { useCategories } from '@/hooks/useCategories';
+import { Colors } from '@/constants/theme';
+import { SIZES } from '@/constants/sizes';
+import { getCategoryIcon } from '@/utils/mapMarkers';
 
 {
   /*
    * We need to load maps dynamically to avoid the "Metro error: window is not defined".
-   * This happens because Expo Router on the web uses Server-Side Rendering (SSR).
-   * Before the page reaches the browser, Expo tries to pre-render the HTML on a Node.js server to make it load faster.
-   * The core issue is that the Node.js server is just a console environment - it doesn't have a graphical interface, a mouse, and most importantly, it lacks the browser's global `window` object.
-   * Since Leaflet requires the `window` object to calculate map dimensions, we must ensure it only loads on the client side.
    */
 }
 
@@ -15,6 +15,8 @@ const WebMap = React.lazy(() => import('@/components/map-container'));
 
 export default function HomeScreen() {
   const [isMounted, setIsMounted] = useState(false);
+  const { categories } = useCategories();
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -22,6 +24,29 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* KATEGORIE FILTER */}
+      <View style={styles.categoriesFilterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SIZES.md, paddingVertical: SIZES.xs }}>
+           <Pressable
+            style={[styles.filterPill, !selectedCategoryId && styles.filterPillActive]}
+            onPress={() => setSelectedCategoryId(null)}
+          >
+            <Text style={[styles.filterText, !selectedCategoryId && styles.filterTextActive]}>Wszystkie</Text>
+          </Pressable>
+          {categories.map((cat) => (
+             <Pressable
+             key={cat.id}
+             style={[styles.filterPill, selectedCategoryId === cat.id && styles.filterPillActive]}
+             onPress={() => setSelectedCategoryId(cat.id)}
+           >
+             <Text style={[styles.filterText, selectedCategoryId === cat.id && styles.filterTextActive]}>
+               {cat.name}
+             </Text>
+           </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
       {Platform.OS === 'web' && isMounted ? (
         <Suspense
           fallback={
@@ -31,7 +56,7 @@ export default function HomeScreen() {
           }
         >
           <View style={styles.innerContainer}>
-            <WebMap />
+            <WebMap filterCategoryId={selectedCategoryId} />
           </View>
         </Suspense>
       ) : (
@@ -42,6 +67,7 @@ export default function HomeScreen() {
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -57,5 +83,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent'
+  },
+  categoriesFilterContainer: {
+    position: 'absolute',    
+    top: SIZES.md,
+    zIndex: 10,
+    width: '100%'
+  },
+  filterPill: {
+    backgroundColor: Colors.white,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: SIZES.sm,
+    borderRadius: SIZES.radius_pill,
+    marginRight: SIZES.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.border
+  },
+  filterPillActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary
+  },
+  filterText: {
+    color: Colors.textMuted,
+    fontWeight: '600',
+    fontSize: SIZES.body_sm
+  },
+  filterTextActive: {
+    color: Colors.white
   }
 });
