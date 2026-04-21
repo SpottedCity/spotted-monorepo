@@ -4,8 +4,6 @@ import React, { useEffect } from 'react';
 import { MapContainer as Map, Marker, TileLayer, useMap } from 'react-leaflet';
 
 import ReportPopup from '@/components/report-popup';
-import { mockReports } from '@/constants/map-data';
-import { useProfile } from '@/hooks/use-profile';
 import { useAuth } from '@/context/auth-context';
 import { useNearbyPosts } from '@/hooks/use-nearby-posts';
 import { getCategoryIcon } from '@/utils/mapMarkers';
@@ -26,11 +24,13 @@ const MapUpdater = ({ center }: { center: [number, number] }) => {
   return null;
 };
 
+// Dodajemy prop refreshTick
 interface LeafletMapProps {
   filterCategoryId?: string | null;
+  refreshTick?: number;
 }
 
-const LeafletMap = ({ filterCategoryId }: LeafletMapProps) => {
+const LeafletMap = ({ filterCategoryId, refreshTick }: LeafletMapProps) => {
   const { user } = useAuth();
   const { location: gpsLocation } = useLocation();
 
@@ -46,9 +46,19 @@ const LeafletMap = ({ filterCategoryId }: LeafletMapProps) => {
   const lng = gpsLocation?.longitude || user?.selectedCity?.longitude || defaultLng;
   const mapCenter: [number, number] = [lat, lng];
 
-  const { posts, isLoading } = useNearbyPosts(lat, lng, 20);
+  // Wyciągamy też refetch, aby użyć go po wejściu na zakładkę
+  const { posts, isLoading, refetch } = useNearbyPosts(lat, lng, 20);
 
-  const filteredPosts = posts.filter(p => !filterCategoryId || p.category.id === filterCategoryId);
+  // Wymusza pobranie od nowa danych z API, jeżeli zakładka staje się aktywna
+  useEffect(() => {
+    if (refreshTick && refreshTick > 0) {
+      refetch();
+    }
+  }, [refreshTick, refetch]);
+
+  const filteredPosts = posts.filter(
+    (p) => !filterCategoryId || p.category.id === filterCategoryId
+  );
 
   return (
     <Map
@@ -68,11 +78,17 @@ const LeafletMap = ({ filterCategoryId }: LeafletMapProps) => {
       />
       {!isLoading &&
         filteredPosts.map((post) => {
-          const icon = typeof window !== 'undefined' ? getCategoryIcon(post.category.slug) : undefined;
+          const icon =
+            typeof window !== 'undefined' ? getCategoryIcon(post.category.slug) : undefined;
           return (
-          <Marker key={post.id} position={[post.latitude, post.longitude]} icon={icon}>     
-            <ReportPopup report={post} />
-          </Marker>
+            <Marker key={post.id} position={[post.latitude, post.longitude]} icon={icon}>
+              <ReportPopup
+                report={post}
+                onPostDeleted={() => {
+                  refetch(); // Możemy użyć tu `refetch` zamiast window.location.reload()
+                }}
+              />
+            </Marker>
           );
         })}
     </Map>

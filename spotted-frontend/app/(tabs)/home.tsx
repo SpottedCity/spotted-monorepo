@@ -1,15 +1,10 @@
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState, useCallback } from 'react';
 import { Platform, StyleSheet, Text, View, ScrollView, Pressable } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useCategories } from '@/hooks/useCategories';
 import { Colors } from '@/constants/theme';
 import { SIZES } from '@/constants/sizes';
 import { getCategoryIcon } from '@/utils/mapMarkers';
-
-{
-  /*
-   * We need to load maps dynamically to avoid the "Metro error: window is not defined".
-   */
-}
 
 const WebMap = React.lazy(() => import('@/components/map-container'));
 
@@ -18,31 +13,51 @@ export default function HomeScreen() {
   const { categories } = useCategories();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
+  // Nowy stan sterujący odświeżaniem zgłoszeń
+  const [refreshTick, setRefreshTick] = useState(0);
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Odpala się za każdym razem, gdy użytkownik wejdzie na tę zakładkę (np. powrót z Report)
+  useFocusEffect(
+    useCallback(() => {
+      setRefreshTick((prev) => prev + 1);
+    }, [])
+  );
+
   return (
     <View style={styles.container}>
-      {/* KATEGORIE FILTER */}
       <View style={styles.categoriesFilterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SIZES.md, paddingVertical: SIZES.xs }}>
-           <Pressable
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: SIZES.md, paddingVertical: SIZES.xs }}
+        >
+          <Pressable
             style={[styles.filterPill, !selectedCategoryId && styles.filterPillActive]}
             onPress={() => setSelectedCategoryId(null)}
           >
-            <Text style={[styles.filterText, !selectedCategoryId && styles.filterTextActive]}>Wszystkie</Text>
+            <Text style={[styles.filterText, !selectedCategoryId && styles.filterTextActive]}>
+              Wszystkie
+            </Text>
           </Pressable>
           {categories.map((cat) => (
-             <Pressable
-             key={cat.id}
-             style={[styles.filterPill, selectedCategoryId === cat.id && styles.filterPillActive]}
-             onPress={() => setSelectedCategoryId(cat.id)}
-           >
-             <Text style={[styles.filterText, selectedCategoryId === cat.id && styles.filterTextActive]}>
-               {cat.name}
-             </Text>
-           </Pressable>
+            <Pressable
+              key={cat.id}
+              style={[styles.filterPill, selectedCategoryId === cat.id && styles.filterPillActive]}
+              onPress={() => setSelectedCategoryId(cat.id)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  selectedCategoryId === cat.id && styles.filterTextActive
+                ]}
+              >
+                {cat.name}
+              </Text>
+            </Pressable>
           ))}
         </ScrollView>
       </View>
@@ -56,7 +71,8 @@ export default function HomeScreen() {
           }
         >
           <View style={styles.innerContainer}>
-            <WebMap filterCategoryId={selectedCategoryId} />
+            {/* Przekazujemy refreshTick do środka mapy */}
+            <WebMap filterCategoryId={selectedCategoryId} refreshTick={refreshTick} />
           </View>
         </Suspense>
       ) : (
@@ -85,7 +101,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent'
   },
   categoriesFilterContainer: {
-    position: 'absolute',    
+    position: 'absolute',
     top: SIZES.md,
     zIndex: 10,
     width: '100%'

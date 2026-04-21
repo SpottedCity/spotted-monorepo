@@ -28,6 +28,9 @@ export class UploadsController {
       @UploadedFile() file: Express.Multer.File,
       @UserId() userId: string,
   ) {
+    if (!file) {
+      throw new BadRequestException('No file! Verify that FormData is sending correctly.');
+    }
     const url = await this.uploadsService.uploadImage(file, `posts/${userId}`);
     return { url };
   }

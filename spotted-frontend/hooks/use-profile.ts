@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform } from 'react-native'; // <-- Dodany import Platform
+import { Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/auth-context';
 import { useImagePicker } from '@/hooks/use-image-picker';
@@ -19,6 +19,8 @@ export const useProfile = () => {
   const [apiError, setApiError] = useState('');
   const [isCityModalVisible, setCityModalVisible] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  // Dodajemy stan na podgląd zdjęcia zanim serwer odpowie
+  const [previewUri, setPreviewUri] = useState<string | null>(null); 
 
   const currentScore = user?.reputation?.score || 0;
   const currentTrustLevel = getTrustLevel(currentScore);
@@ -50,8 +52,11 @@ export const useProfile = () => {
     const uri = await pickImage(true);
     if (!uri) return;
 
+    // Natychmiast ustawiamy zdjęcie z telefonu/komputera do podglądu!
+    setPreviewUri(uri); 
     setApiError('');
     setIsUploading(true);
+    
     try {
       const formData = new FormData();
       const filename = uri.split('/').pop() || 'avatar.jpg';
@@ -70,19 +75,21 @@ export const useProfile = () => {
         } as any);
       }
 
-      await apiClient.post('/uploads/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const config = Platform.OS === 'web' 
+        ? undefined 
+        : { headers: { 'Content-Type': 'multipart/form-data' } };
 
-      console.log('Awatar wysłany na backend i zapisany!');
+      await apiClient.post('/uploads/avatar', formData, config);
+      
+      // Odświeżamy obiekt użytkownika, by dostać prawdziwy link z chmury Supabase
       await refreshUser();
     } catch (error: any) {
       console.error('Błąd uploadu awatara:', error);
+      Alert.alert('Błąd', 'Nie udało się wgrać zdjęcia profilowego na serwer.');
       setApiError('Nie udało się wgrać awatara na serwer.');
     } finally {
       setIsUploading(false);
+      setPreviewUri(null); // Czyścimy podgląd po załadowaniu
     }
   };
 
@@ -95,6 +102,7 @@ export const useProfile = () => {
     isCityModalVisible,
     setCityModalVisible,
     isUploading,
+    previewUri,
     handleLogOut,
     handleCitySelect,
     handlePickAndUploadAvatar

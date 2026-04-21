@@ -5,7 +5,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 @Injectable()
 export class UploadsService {
   private supabase: SupabaseClient;
-  private bucket: string = 'avatars';
+  private bucket: string = 'spotted-images';
 
   constructor(private configService: ConfigService) {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL') || '';

@@ -1,5 +1,17 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, ScrollView, Alert, ActivityIndicator, Pressable } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  Pressable,
+  Image,
+  Keyboard,
+  Platform
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/theme';
@@ -11,13 +23,15 @@ import { useAuth } from '@/context/auth-context';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { useImagePicker } from '@/hooks/use-image-picker';
-import { Image } from 'react-native';
+import { useLocation } from '@/hooks/useLocation';
 
 export default function Report() {
   const { categories, loading: catLoading } = useCategories();
   const { user } = useAuth();
   const router = useRouter();
-  const { imageUri, pickImage } = useImagePicker();
+  // Zauważ, że wyciągamy clearImage, aby wyczyścić zdjęcie po udanym dodaniu
+  const { imageUri, pickImage, clearImage } = useImagePicker();
+  const { location } = useLocation();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -37,30 +51,59 @@ export default function Report() {
 
     setIsSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('categoryId', categoryId);
-      formData.append('cityId', user.selectedCity.name);
-      formData.append('latitude', String(user.selectedCity.latitude));
-      formData.append('longitude', String(user.selectedCity.longitude));
-      
+      let finalImageUrl = undefined;
+
       if (imageUri) {
-        const filename = imageUri.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename!);
-        const type = match ? `image/${match[1]}` : `image`;
-        formData.append('file', { uri: imageUri, name: filename, type } as any);
+        const fileFormData = new FormData();
+        const filename = imageUri.split('/').pop() || 'image.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+        if (Platform.OS === 'web') {
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          fileFormData.append('file', blob, filename);
+        } else {
+          fileFormData.append('file', { uri: imageUri, name: filename, type } as any);
+        }
+
+        // POPRAWKA: Na Webie nie przekazujemy W OGÓLE obiektu headers,
+        // aby przeglądarka automatycznie ustawiła poprawne "boundary" dla multipart/form-data
+        const config =
+          Platform.OS === 'web' ? {} : { headers: { 'Content-Type': 'multipart/form-data' } };
+
+        try {
+          const uploadRes = await apiClient.post('/uploads/image', fileFormData, config);
+          finalImageUrl = uploadRes.data.url;
+        } catch (e) {
+          console.warn('Nie udało sie wgrać zdjęcia', e);
+          Alert.alert('Błąd', 'Nie udało się wgrać zdjęcia. Sprawdź logi serwera (błąd 500).');
+          setIsSubmitting(false);
+          return; // Przerywamy wysyłanie zgłoszenia, jeśli zdjęcie nie przeszło
+        }
       }
 
-      await apiClient.post('/posts', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      await apiClient.post('/posts', {
+        title,
+        description,
+        categoryId,
+        cityId: user.selectedCity.id,
+        latitude: location?.latitude ?? user.selectedCity.latitude,
+        longitude: location?.longitude ?? user.selectedCity.longitude,
+        imageUrl: finalImageUrl
       });
 
       Alert.alert('Sukces', 'Zgłoszenie zostało dodane!');
       setTitle('');
       setDescription('');
       setCategoryId('');
-      router.replace('/(tabs)/home');
+      clearImage();
+      Keyboard.dismiss();
+
+      // Navigate użyte do poprawnego przejścia między zakładkami
+      setTimeout(() => {
+        router.navigate('/home');
+      }, 100);
     } catch (error) {
       console.error(error);
       Alert.alert('Błąd', 'Nie udało się dodać zgłoszenia.');
@@ -104,7 +147,12 @@ export default function Report() {
                       categoryId === cat.id && styles.categoryBadgeSelected
                     ]}
                   >
-                    <Text style={[styles.categoryText, categoryId === cat.id && { color: Colors.white }]}>
+                    <Text
+                      style={[
+                        styles.categoryText,
+                        categoryId === cat.id && { color: Colors.white }
+                      ]}
+                    >
                       {cat.name}
                     </Text>
                   </Pressable>
@@ -140,13 +188,12 @@ export default function Report() {
             </Pressable>
           </View>
 
-          <CustomButton 
-            title="Dodaj zgłoszenie" 
+          <CustomButton
+            title="Dodaj zgłoszenie"
             iconName="plus"
-            onPress={handleSubmit} 
-            disabled={isSubmitting} 
+            onPress={handleSubmit}
+            disabled={isSubmitting}
           />
-
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -160,14 +207,14 @@ const styles = StyleSheet.create({
     fontSize: SIZES.h2,
     fontWeight: 'bold',
     color: Colors.primary,
-    marginBottom: SIZES.xl,
+    marginBottom: SIZES.xl
   },
   inputContainer: { marginBottom: SIZES.lg },
   label: {
     fontSize: SIZES.body_md,
     fontWeight: 'bold',
     color: Colors.primary,
-    marginBottom: SIZES.xs,
+    marginBottom: SIZES.xs
   },
   input: {
     backgroundColor: Colors.white,
@@ -177,16 +224,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.md,
     paddingVertical: SIZES.md,
     fontSize: SIZES.body_lg,
-    color: Colors.primary,
+    color: Colors.primary
   },
   textArea: {
     height: 100,
-    textAlignVertical: 'top',
+    textAlignVertical: 'top'
   },
   categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SIZES.xs,
+    gap: SIZES.xs
   },
   categoryBadge: {
     paddingHorizontal: SIZES.md,
@@ -196,15 +243,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     marginBottom: SIZES.sm,
-    marginRight: SIZES.sm,
+    marginRight: SIZES.sm
   },
   categoryBadgeSelected: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    borderColor: Colors.primary
   },
   categoryText: {
     color: Colors.primary,
-    fontWeight: '600',
+    fontWeight: '600'
   },
   imagePicker: {
     borderWidth: 2,
@@ -214,18 +261,18 @@ const styles = StyleSheet.create({
     height: 150,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
+    overflow: 'hidden'
   },
   previewImage: {
     width: '100%',
-    height: '100%',
+    height: '100%'
   },
   imagePlaceholder: {
-    alignItems: 'center',
+    alignItems: 'center'
   },
   imagePlaceholderText: {
     marginTop: SIZES.sm,
     color: Colors.textMuted,
-    fontSize: SIZES.body_sm,
+    fontSize: SIZES.body_sm
   }
 });

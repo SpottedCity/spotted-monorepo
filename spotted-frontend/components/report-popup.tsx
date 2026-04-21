@@ -1,8 +1,11 @@
+import { useAuth } from '@/context/auth-context';
 import { apiClient } from '@/constants/api';
 import { SIZES } from '@/constants/sizes';
 import { Colors } from '@/constants/theme';
 import React, { useState } from 'react';
 import { Popup } from 'react-leaflet';
+import Feather from '@expo/vector-icons/Feather';
+import Comments from './comments';
 
 export interface PostReport {
   id: string;
@@ -13,6 +16,7 @@ export interface PostReport {
   downvotes: number;
   imageUrl: string | null;
   author: {
+    id: string;
     firstName: string;
     avatar: string | null;
   };
@@ -24,13 +28,34 @@ export interface PostReport {
 
 interface ReportPopupProps {
   report: PostReport;
+  onPostDeleted?: () => void;
 }
 
-export default function ReportPopup({ report }: ReportPopupProps) {
+export default function ReportPopup({ report, onPostDeleted }: ReportPopupProps) {
   const [upvotes, setUpvotes] = useState(report.upvotes);
   const [downvotes, setDownvotes] = useState(report.downvotes);
   const [isVoting, setIsVoting] = useState(false);
-  const [userVote, setUserVote] = useState<number>(0); 
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [userVote, setUserVote] = useState<number>(0);
+
+  const { user } = useAuth();
+  const isAuthor = user?.id === report.author.id;
+
+  const handleDelete = async () => {
+    if (isDeleting || !isAuthor) return;
+
+    if (window.confirm('Czy na pewno chcesz usunąć to zgłoszenie?')) {
+      setIsDeleting(true);
+      try {
+        await apiClient.delete(`/posts/${report.id}`);
+        if (onPostDeleted) onPostDeleted();
+      } catch (error) {
+        console.error('Błąd usuwania:', error);
+        alert('Nie udało się usunąć zgłoszenia.');
+        setIsDeleting(false);
+      }
+    }
+  };
 
   const handleVote = async (value: number) => {
     if (isVoting) return;
@@ -99,10 +124,28 @@ export default function ReportPopup({ report }: ReportPopupProps) {
           margin: 0,
           marginTop: report.imageUrl ? SIZES.lg : 0,
           fontSize: SIZES.body_lg,
-          color: Colors.primary
+          color: Colors.primary,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}
       >
-        {report.title}
+        <span>{report.title}</span>
+        {isAuthor && (
+          <button
+            onClick={handleDelete}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              opacity: isDeleting ? 0.5 : 1,
+              marginTop: '4px'
+            }}
+            title="Usuń swoje zgłoszenie"
+          >
+            <Feather name="trash-2" size={16} color={Colors.error} />
+          </button>
+        )}
       </h3>
 
       {/* Metadata */}
@@ -172,6 +215,8 @@ export default function ReportPopup({ report }: ReportPopupProps) {
           👎 {downvotes}
         </button>
       </div>
+
+      <Comments postId={report.id} />
     </Popup>
   );
 }

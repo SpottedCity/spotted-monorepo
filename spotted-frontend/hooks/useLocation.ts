@@ -13,18 +13,21 @@ export const useLocation = () => {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           setErrorMsg('Permission to access location was denied');
-          Alert.alert('Brak uprawnień', 'Wymagany jest dostęp do lokalizacji aby prawidłowo korzystać z aplikacji.');
+          Alert.alert(
+            'Brak uprawnień',
+            'Wymagany jest dostęp do lokalizacji aby prawidłowo korzystać z aplikacji.'
+          );
           setIsLoading(false);
           return;
         }
 
         let userLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+          accuracy: Location.Accuracy.Balanced
         });
 
         setLocation({
           latitude: userLocation.coords.latitude,
-          longitude: userLocation.coords.longitude,
+          longitude: userLocation.coords.longitude
         });
       } catch (err: any) {
         console.error(err);

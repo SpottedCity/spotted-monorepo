@@ -2,7 +2,7 @@ import { SIZES } from '@/constants/sizes';
 import { Colors } from '@/constants/theme';
 import Feather from '@expo/vector-icons/Feather';
 import React from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View, ActivityIndicator } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 interface AvatarProgressProps {
@@ -11,6 +11,7 @@ interface AvatarProgressProps {
   maxPoints: number;
   size?: number;
   strokeWidth?: number;
+  isUploading?: boolean;
   onEditPress: () => void;
 }
 
@@ -20,6 +21,7 @@ export default function AvatarProgress({
   maxPoints,
   size = 140,
   strokeWidth = 8,
+  isUploading = false,
   onEditPress
 }: AvatarProgressProps) {
   const radius = (size - strokeWidth) / 2;
@@ -54,13 +56,33 @@ export default function AvatarProgress({
         />
       </Svg>
 
-      <Image
-        source={imageUrl ? { uri: imageUrl } : require('@/assets/images/pfp.jpg')}
-        style={[styles.image, { width: imageSize, height: imageSize, borderRadius: imageSize / 2 }]}
-      />
+      <View
+        style={[
+          styles.imageContainer,
+          { width: imageSize, height: imageSize, borderRadius: imageSize / 2 }
+        ]}
+      >
+        <Image
+          source={imageUrl ? { uri: imageUrl } : require('@/assets/images/pfp.jpg')}
+          style={[
+            styles.image,
+            { width: imageSize, height: imageSize, borderRadius: imageSize / 2 }
+          ]}
+        />
+        {/* Spinner w czasie uploadu */}
+        {isUploading && (
+          <View style={styles.uploadingOverlay}>
+            <ActivityIndicator size="large" color={Colors.white} />
+          </View>
+        )}
+      </View>
 
-      <Pressable style={styles.editIconContainer} onPress={onEditPress}>
-        <Feather name="camera" size={SIZES.icon_sm} color={Colors.white} />
+      <Pressable style={styles.editIconContainer} onPress={onEditPress} disabled={isUploading}>
+        <Feather
+          name={isUploading ? 'loader' : 'camera'}
+          size={SIZES.icon_sm}
+          color={Colors.white}
+        />
       </Pressable>
     </View>
   );
@@ -72,9 +94,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative'
   },
+  imageContainer: {
+    position: 'absolute',
+    zIndex: 1,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
   image: {
-    borderWidth: 2,
-    borderColor: Colors.surface
+    position: 'absolute',
+    width: '100%',
+    height: '100%'
+  },
+  uploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2
   },
   editIconContainer: {
     position: 'absolute',
@@ -87,6 +124,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: Colors.white
+    borderColor: Colors.white,
+    zIndex: 3
   }
 });

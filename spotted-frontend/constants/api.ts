@@ -9,10 +9,7 @@ export const API_URL =
   Platform.OS === 'web' ? `http://localhost:${PORT}` : `http://${MOBILE_LOCAL_IP}:${PORT}`;
 
 export const apiClient = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  baseURL: API_URL
 });
 
 apiClient.interceptors.request.use(async (config) => {

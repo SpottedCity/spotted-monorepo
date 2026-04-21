@@ -1,12 +1,13 @@
 import { apiClient } from '@/constants/api';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 export const useNearbyPosts = (lat?: number, lng?: number, radius: number = 15) => {
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchNearbyPosts = async () => {
+  const fetchNearbyPosts = useCallback(async () => {
     if (!lat || !lng) return;
     setIsLoading(true);
     setError('');
@@ -17,16 +18,18 @@ export const useNearbyPosts = (lat?: number, lng?: number, radius: number = 15) 
       );
       setPosts(response.data);
     } catch (err: any) {
-      console.error('Błąd pobierania zgłoszeń:', err);
-      setError('Nie udało się pobrać zgłoszeń z okolicy');
+      console.error(err);
+      setError('Error');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchNearbyPosts();
   }, [lat, lng, radius]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchNearbyPosts();
+    }, [fetchNearbyPosts])
+  );
 
   return { posts, isLoading, error, refetch: fetchNearbyPosts };
 };

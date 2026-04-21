@@ -17,6 +17,7 @@ export interface User {
     totalDownvotes: number;
   };
   selectedCity?: {
+    id: string;
     name: string;
     voivodeship: string;
     latitude: number;
