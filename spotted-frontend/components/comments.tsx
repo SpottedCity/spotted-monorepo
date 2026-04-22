@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   },
   content: {
     fontSize: SIZES.body_md,
-    color: Colors.text,
+    color: Colors.textMuted,
     marginBottom: 4
   },
   date: {
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     minHeight: 40,
     maxHeight: 100,
-    color: Colors.text
+    color: Colors.textMuted
   },
   submitButton: {
     backgroundColor: Colors.primary,

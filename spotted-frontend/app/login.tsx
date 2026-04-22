@@ -5,8 +5,8 @@ import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+
 import {
   KeyboardAvoidingView,
   Platform,

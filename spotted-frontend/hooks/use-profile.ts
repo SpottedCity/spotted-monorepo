@@ -20,7 +20,7 @@ export const useProfile = () => {
   const [isCityModalVisible, setCityModalVisible] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   // Dodajemy stan na podgląd zdjęcia zanim serwer odpowie
-  const [previewUri, setPreviewUri] = useState<string | null>(null); 
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
 
   const currentScore = user?.reputation?.score || 0;
   const currentTrustLevel = getTrustLevel(currentScore);
@@ -53,10 +53,10 @@ export const useProfile = () => {
     if (!uri) return;
 
     // Natychmiast ustawiamy zdjęcie z telefonu/komputera do podglądu!
-    setPreviewUri(uri); 
+    setPreviewUri(uri);
     setApiError('');
     setIsUploading(true);
-    
+
     try {
       const formData = new FormData();
       const filename = uri.split('/').pop() || 'avatar.jpg';
@@ -75,12 +75,11 @@ export const useProfile = () => {
         } as any);
       }
 
-      const config = Platform.OS === 'web' 
-        ? undefined 
-        : { headers: { 'Content-Type': 'multipart/form-data' } };
+      const config =
+        Platform.OS === 'web' ? undefined : { headers: { 'Content-Type': 'multipart/form-data' } };
 
       await apiClient.post('/uploads/avatar', formData, config);
-      
+
       // Odświeżamy obiekt użytkownika, by dostać prawdziwy link z chmury Supabase
       await refreshUser();
     } catch (error: any) {
